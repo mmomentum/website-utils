@@ -66,10 +66,23 @@ function add_mailpoet_tag_to_subscriber($subscriber_id, $tag_id) {
 
 	log_message("Attempting to assign tag ID " . $tag_id . " to subscriber ID " . $subscriber_id . ".");
 
+    $existing_tag = $wpdb->get_var(
+        $wpdb->prepare("
+            SELECT tag_id
+            FROM wp_mailpoet_subscriber_tag
+            WHERE subscriber_id = %d AND tag_id = %d
+        ", $subscriber_id, $tag_id)
+    );
 
-    $data = array('subscriber_id' => $subscriber_id, 'tag_id' => $tag_id);
-
-    $wpdb->insert('wp_mailpoet_subscriber_tag', $data);
+	// pre-emptively check 
+	if (empty($existing_tag)) {
+		$data = array('subscriber_id' => $subscriber_id, 'tag_id' => $tag_id);
+		
+		$wpdb->insert('wp_mailpoet_subscriber_tag', $data);
+	}
+	else {
+		log_message("Skipping: Duplicate tag already exists in database.");
+	}
 }
 
 // called when edd_complete_purchase occurs
@@ -138,31 +151,24 @@ function purchase_subscriber_tag($payment_id) {
 
 add_action('edd_complete_purchase', 'purchase_subscriber_tag', 10, 3);
 
-// handles tagging of all edd customers. useful for retroactive tagging. we only do customers and not
-// every order, because most orders are just free downloads. registered customers are more likely to
-// have completed real transactions, and that's what we care about
-function tag_all_customers() {
+// handles tagging of all edd customers. useful for retroactive tagging. will be very, very slow to run.
+function tag_all_customers() {	
+	// get a batch of payments
 	
-// Get all EDD customers
-$customers = edd_get_customers();
-
-// Loop through each customer
-foreach ($customers as $customer) {
-    // Get the customer's email address
-    $email = $customer->email;
-
-    // Get all payments for the customer
-    $payments = edd_get_payments(array(
-        'email' => $email
-    ));
-
-    // Loop through each payment and get the payment ID
-    foreach ($payments as $payment) {
-        $payment_id = $payment->ID;
+	$db_offset = get_option( 'edd_mailpoet_retrotagger_db_offset', 0 );
+    $new_value = $db_offset + 1000;
+    update_option( 'edd_mailpoet_retrotagger_db_offset', $new_value );
 	
-		// run the tagging function
-		purchase_subscriber_tag($payment_id);
-    }
+	$payments = edd_get_payments(array(
+    'number' => 1000,
+	'offset' => $new_value,
+));
+
+// Loop through each payment and get the payment ID
+foreach ($payments as $payment) {
+    $payment_id = $payment->ID;
+
+	purchase_subscriber_tag($payment_id);
 }
 	
 }
@@ -184,8 +190,7 @@ function edd_mailpoet_tagger_menu() {
 function edd_mailpoet_tagger_page() {
 	// perform the tag_all_customers() function if the button is pressed
     if ( isset( $_POST['retroactive_tag'] ) ) {	
-		tag_all_customers();
-		
+		tag_all_customers();	
 		echo '<div class="notice notice-success is-dismissible"><p>Retroactive tagging completed.</p></div>';
 	}
 	
