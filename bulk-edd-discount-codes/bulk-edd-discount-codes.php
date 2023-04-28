@@ -2,13 +2,13 @@
 /**
  * Plugin Name: Bulk EDD Discount Codes
  * Description: Generates bulk EDD discount codes.
- * Version: 1.0
+ * Version: 1.1
  * Author: Aidan Baker
  * Author URI: https://lese.io
  */
 
 // Hook into the admin menu
-add_action( 'admin_menu', 'bulk_edd_discount_codes_menu' );
+add_action( 'admin_menu', 'lese_bulk_edd_discount_codes_menu' );
 
 // Add a menu item for the plugin
 function lese_bulk_edd_discount_codes_menu() {
@@ -29,6 +29,9 @@ function lese_bulk_edd_discount_codes_page() {
         // Number of discount codes to generate
         $number_of_codes = $_POST['number_of_codes'];
 
+		// Number of characters that make up a random code's string
+		$num_characters = $_POST['num_characters'];
+
         // Characters and numbers to use for the discount code
         $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -36,7 +39,7 @@ function lese_bulk_edd_discount_codes_page() {
         for ( $i = 1; $i <= $number_of_codes; $i++ ) {
             $code = '';
 			
-            for ( $j = 0; $j < 5; $j++ ) {
+            for ( $j = 0; $j < $num_characters; $j++ ) {
                 $code .= $characters[ rand( 0, strlen( $characters ) - 1 ) ];
             }
 
@@ -87,10 +90,15 @@ function lese_bulk_edd_discount_codes_page() {
                 <th scope="row">Number of Discount Codes</th>
                 <td><input type="number" name="number_of_codes" min="1" max="1000" required></td>
             </tr>
+			<tr valign="top">
+                <th scope="row">Discount Code Complexity</th>
+                <td><input type="number" name="num_characters" min="3" max="10" value="5" required></td>
+            </tr>
             <tr valign="top">
                 <th scope "row">Discount Code Custom Name (optional)</th>
                 <td><input type="Text" id="discount_name" name="discount_name" value="Free Product Discount"></td>
             </tr>
+			
             <tr valign="top">
                 <th scope="row">Product Requirements (optional)</th>
                 <td>
