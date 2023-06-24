@@ -13,8 +13,8 @@ function retroactive_license_generate()
     $db_offset = get_option( 'license_creator_db_offset', 0 );
 
 	$payments = edd_get_payments(array(
-        'number' => 1000,
-	    'offset' => $db_offset));
+        'number' => 500,
+	    'offset' => 0));
 
     global $wpdb;
 
@@ -39,19 +39,19 @@ function retroactive_license_generate()
             {
                 $license_key =  generate_key();
             
-                $user_id = check_user_email($customer_email);
+                $multi_id = check_user_email($customer_email);
 
                 $data = array(
                 'license_key' => $license_key,
-                'status' => "active",
+                'status' => "inactive",
                 'download_id' => $download_id,
                 'payment_id' => $payment_id,
                 'cart_index' => $i,
                 'date_created' => $date,
                 'expiration' => 0,
                 'parent' => 0,
-                'customer_id' => $customer_id,
-                'user_id' => $user_id);
+                'customer_id' => $multi_id['edd_id'],
+                'user_id' => $multi_id['user_id']);
 
                 $wpdb->insert('wp_edd_licenses', $data);
             }
@@ -65,7 +65,7 @@ function generate_key() {
     $string = '';
 
     $max = strlen($characters) - 1;
-    for ($i = 0; $i < 24; $i++) {
+    for ($i = 0; $i < 16; $i++) {
         $string .= $characters[mt_rand(0, $max)];
     }
 
@@ -73,33 +73,39 @@ function generate_key() {
 }
 
 // checks if a user email (in the payment meta) matches one in the wp_users table. if no match then
-// we return -1, if there IS a match, we return that row's user ID.
+// we return -1, if there IS a match, we return that row's user & customer ID (two different things,
+// one is the user's WP ID and theother is the ID that EDD uses)
 function check_user_email($email) {
     global $wpdb;
-    
-    // Prepare the query
-    $query = $wpdb->prepare(
-        "SELECT ID FROM {$wpdb->prefix}users WHERE user_email = %s",
-        $email
-    );
-    
-    // Run the query
-    $result = $wpdb->get_var($query);
-    
-    // Check the result
-    if ($result !== null) {
-        // Match found, return the user ID
-        return $result;
+
+    $table_name = 'wp_edd_customers';
+
+    $query = $wpdb->prepare("SELECT id, user_id FROM $table_name WHERE email = %s", $email);
+    $result = $wpdb->get_row($query, ARRAY_A);
+
+    if ($result) {
+        $data = array(
+            'edd_id' => $result['id'],
+            'user_id' => $result['user_id']
+        );
+        return $data;
     } else {
-        // No match found, return -1
-        return -1;
+        $data = array(
+            'edd_id' => -1,
+            'user_id' => -1
+        );
+        return $data;
     }
 }
 
+// these are hardcoded in because making a custom db for it isnt worth it
 function download_id_match($download_id) {
         switch ($download_id) {
         case 121:
         case 405:
+		case 14003:
+		case 16574:
+		case 16837:
             return true;
         default:
             return false;
@@ -108,7 +114,7 @@ function download_id_match($download_id) {
 
 function retro_create_batch() {	
 	$db_offset = get_option( 'license_creator_db_offset', 0 );
-    $new_value = $db_offset + 1000;
+    $new_value = $db_offset + 500;
     update_option( 'license_creator_db_offset', $new_value );
 
     
