@@ -4,6 +4,11 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
+/**
+ * Custom Elementor form action that puts people on a mailpoet list, but doesn't do any confirmation email 
+ * and auto-confirms them to recieve further correspondance.
+ * 
+ */
 class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\Integration_Base
 {
 
@@ -20,12 +25,12 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	}
 
 	/**
-		   * Get action label.
-		   
-		   * @since 1.0.0
-		   * @access public
-		   * @return string
-		   */
+			  * Get action label.
+			  
+			  * @since 1.0.0
+			  * @access public
+			  * @return string
+			  */
 	public function get_label()
 	{
 		return esc_html__('Mailpoet Confirm', 'elementor-pro');
@@ -95,7 +100,8 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 
 		$extra_options['send_confirmation_email'] = false;
 		$extra_options['schedule_welcome_email'] = false;
-		
+		$extra_options['skip_subscriber_notification'] = false;
+
 		$mailpoet_api = \MailPoet\API\API::MP('v1');
 
 		try {
@@ -141,11 +147,6 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 		}
 	}
 
-	/**
-	 * @param Form_Record $record
-	 *
-	 * @return array
-	 */
 	private function map_fields($record)
 	{
 		$settings = $record->get('form_settings');

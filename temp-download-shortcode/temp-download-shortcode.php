@@ -7,7 +7,8 @@
  * Author URI: https://lese.io
  */
 
-function expiring_download_link_shortcode($atts) {
+function expiring_download_link_shortcode($atts)
+{
     // Extract shortcode attributes
     $atts = shortcode_atts(
         array(
@@ -38,36 +39,45 @@ function expiring_download_link_shortcode($atts) {
     $expires = time() + intval($atts['expires']);
 
     // Save token and expiration time in transient with expiration time
-    set_transient('download_link_' . $token, $file_path, $expires);
+    set_transient('temp_download_link_' . $token, $file_path, $expires);
 
     // Generate download link with token as query parameter
-    $download_url = add_query_arg(array('token' => $token), home_url('/download'));
+    $download_url = add_query_arg(array('token' => $token), home_url('/temp_download'));
 
-    $link_text = esc_html( $atts['text'] );
+    $link_text = esc_html($atts['text']);
     // Return download link HTML
     return '<a href="' . esc_url($download_url) . '">' . $link_text . '</a>';
 }
 add_shortcode('expiring_download_link', 'expiring_download_link_shortcode');
 
 // Function to handle download requests
-function custom_handle_download_request() {
+function custom_handle_download_request()
+{
     if (isset($_GET['token'])) {
+        if (isset($_GET['eddfile'])) // bail out if it's an EDD file (so it uses the original functionality)
+            return;
+
         // Retrieve file path from transient using token
-        $file = get_transient('download_link_' . $_GET['token']);
+        $file = get_transient('temp_download_link_' . $_GET['token']);
 
         // Check if file path is valid
         if ($file && file_exists($file)) {
             // Set appropriate headers
+
+            // use EDD to determine the `Content-Type` header. `edd_get_file_ctype()` has a LOT of possibilities
+            $file_extension = edd_get_file_extension($file);
+            $ctype = edd_get_file_ctype($file_extension);
+
+            nocache_headers();
+            header('Robots: none');
             header('Content-Description: File Transfer');
-            header('Content-Type: application/octet-stream');
+            header('Content-Type: ' . $ctype);
             header('Content-Disposition: attachment; filename=' . basename($file));
-            header('Expires: 0');
-            header('Cache-Control: must-revalidate');
-            header('Pragma: public');
-            header('Content-Length: ' . filesize($file));
-            ob_clean();
-            flush();
-            readfile($file);
+            header('Content-Length: ' . @filesize($file));
+            header('Content-Transfer-Encoding: binary');
+         
+            edd_deliver_download($file);
+
             exit;
         } else {
             // Invalid token or file not found
