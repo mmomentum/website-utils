@@ -25,12 +25,12 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	}
 
 	/**
-			  * Get action label.
-			  
-			  * @since 1.0.0
-			  * @access public
-			  * @return string
-			  */
+				 * Get action label.
+				 
+				 * @since 1.0.0
+				 * @access public
+				 * @return string
+				 */
 	public function get_label()
 	{
 		return esc_html__('Mailpoet Confirm', 'elementor-pro');
@@ -78,6 +78,18 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 			]
 		);
 
+		$widget->add_control(
+			'mailpoet_confirm_chance',
+			[
+				'label' => esc_html__('Subscribe Chance', 'elementor-pro'),
+				'type' => \Elementor\Controls_Manager::NUMBER,
+				'label_block' => true,
+				'render_type' => 'none',
+				'description' => 'the chance (as a percentage) that the user will be subscribed.',
+				'default' => '100',
+			]
+		);
+
 		// $this->register_fields_map_control( $widget );
 
 		$widget->end_controls_section();
@@ -93,7 +105,13 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	 */
 	public function run($record, $ajax_handler)
 	{
+		$random_number = rand(0, 100);
 		$settings = $record->get('form_settings');
+
+		// if the chance check fails, then no confirmation will occur (used for the random discount code sending for demo plugins)
+		if(!($random_number <= $settings['mailpoet_confirm_chance']))
+			return;
+
 		$subscriber['email'] = $record->get('sent_data')['email'];
 
 		$existing_subscriber = false;
@@ -223,6 +241,7 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	public function on_export($element)
 	{
 		unset($element['mailpoet_confirm_lists']);
+		unset($element['mailpoet_confirm_chance']);
 
 		return $element;
 	}
