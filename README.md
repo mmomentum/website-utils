@@ -18,3 +18,12 @@ Creates a temporarily download to a file located somewhere on the server and ret
 
 ### Elementor Mailpoet Confirm Action
 Adds a new custom Elementor form post-submit action; Subscribes a user to a mailpoet list based on the provided email and auto-confirms them regardless of settings. Does not send any notifications to the admin or user.
+
+### EDD / Mailpoet Unsubscriber
+Auto unsubscribes people from specific lists based on a table which is adjustable in the admin menu.
+
+### MailPoet Discount Shortcode
+Generates a multi-use shortcode right inside of a mailpoet email
+
+### Elementor Action Tracker
+Tracks how many times a form has been submitted. Implemented as a "post-submit action"
