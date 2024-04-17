@@ -117,7 +117,7 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 		$existing_subscriber = false;
 
 		$extra_options['send_confirmation_email'] = false;
-		$extra_options['schedule_welcome_email'] = false;
+		$extra_options['schedule_welcome_email'] = true;
 		$extra_options['skip_subscriber_notification'] = false;
 
 		$mailpoet_api = \MailPoet\API\API::MP('v1');
