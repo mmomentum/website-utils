@@ -95,20 +95,6 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 		$widget->end_controls_section();
 	}
 
-	public function validate_email($email, $ajax_handler) 
-	{
-		// Extract the domain from the email address
-		list($user, $domain) = explode('@', $email);
-		
-		// Check the DNS MX record
-		if (checkdnsrr($domain, 'MX')) {
-			return true;
-		} else {
-			$handler->add_response_data('success', false);
-			return false;
-		}
-	}
-
 	/**
 	 * Run action.
 	 *
@@ -127,10 +113,6 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 			return;
 
 		$subscriber['email'] = $record->get('sent_data')['email'];
-
-		// validate the email address domain's DNS records to see if an MX record exists
-		if(!validate_email($subscriber['email']), $ajax_handler)
-			return;
 
 		$existing_subscriber = false;
 

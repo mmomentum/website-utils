@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Elementor Mailpoet Subscribe Action
- * Description: Adds users to a mailpoet list after a form submission. counts them as subscribed without needing confirmation.
+ * Description: Adds users to a mailpoet list after a form submission. counts them as subscribed without needing confirmation. Also implements a mailpoet automations trigger system
  * Version: 1.0
  * Author: Aidan Baker
  * Author URI: https://lese.io
@@ -29,5 +29,8 @@ function add_new_mailpoet_confirm_form_action($form_actions_registrar)
 
 	$form_actions_registrar->register(new \Mailpoet_Confirm_After_Submit());
 
+	include_once (__DIR__ . '/form-actions/mailpoet-trigger.php');
+	
+	$form_actions_registrar->register(new \Mailpoet_Action_After_Submit());
 }
 add_action('elementor_pro/forms/actions/register', 'add_new_mailpoet_confirm_form_action');
