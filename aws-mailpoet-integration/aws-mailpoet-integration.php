@@ -45,11 +45,13 @@ class AWSSNSMailPoet {
 				{
                     case 'Bounce':
                         $email = $message['bounce']['bouncedRecipients'][0]['emailAddress'];
+						$this->log('Bounce notification for email: ' . $email);
                         $this->update_mailpoet_status( $email, 'bounced' );
                         break;
 
                     case 'Complaint':
                         $email = $message['complaint']['complainedRecipients'][0]['emailAddress'];
+						$this->log('Complaint notification for email: ' . $email);
                         $this->update_mailpoet_status( $email, 'complaint' );
                         break;
                 }
@@ -63,9 +65,9 @@ class AWSSNSMailPoet {
         $response = wp_remote_get( $subscribe_url );
 
         if ( is_wp_error( $response ) ) {
-            error_log( 'AWS SNS subscription confirmation failed: ' . $response->get_error_message() );
+            $this->log('AWS SNS subscription confirmation failed: ' . $response->get_error_message());
         } else {
-            error_log( 'AWS SNS subscription confirmed: ' . $subscribe_url );
+            $this->log('AWS SNS subscription confirmed: ' . $subscribe_url);
         }
     }
 
@@ -73,16 +75,25 @@ class AWSSNSMailPoet {
 	{
 		$mailpoet_api = \MailPoet\API\API::MP('v1');
 
-        if ( $subscriber ) 
-		{
             if ( $status == 'bounced' ) 
 			{
                 $mailpoet_api->unsubscribe($email);
+				$this->log("Subscriber with email $email has been unsubcribed.");
             } 
 			elseif ( $status == 'complaint' ) 
 			{
                 $mailpoet_api->unsubscribe($email);
+				$this->log("Subscriber with email $email has been unsubcribed.");
             }
+			else
+			{
+				$this->log("Status code not found");
+			}
+    }
+	
+	private function log( $message ) {
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+            error_log( $message );
         }
     }
 }
