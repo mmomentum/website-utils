@@ -4,6 +4,36 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
+function validate_email_with_mx($email) {
+	// Check if the email format is valid
+	if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		return false;
+	}
+	
+	// Extract domain from the email
+	$domain = substr(strrchr($email, "@"), 1);
+	
+	// Check if the domain has valid MX records
+	if (checkdnsrr($domain, 'MX')) {
+		return true;
+	}
+
+	return false;
+}
+
+function is_temporary_email($email) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'lese_temporary_email_domains';
+
+    // Extract the domain from the email
+    $domain = substr(strrchr($email, "@"), 1);
+
+    // Query the database for this domain
+    $result = $wpdb->get_var($wpdb->prepare("SELECT domain FROM $table_name WHERE domain = %s", $domain));
+
+    return !empty($result); // Return true if the domain is found, false otherwise
+}
+
 /**
  * Custom Elementor form action that puts people on a mailpoet list, but doesn't do any confirmation email 
  * and auto-confirms them to recieve further correspondance.
@@ -11,7 +41,6 @@ if (!defined('ABSPATH')) {
  */
 class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\Integration_Base
 {
-
 	/**
 	 * Get action name.
 	 *
@@ -25,12 +54,12 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	}
 
 	/**
-				 * Get action label.
-				 
-				 * @since 1.0.0
-				 * @access public
-				 * @return string
-				 */
+					* Get action label.
+					
+					* @since 1.0.0
+					* @access public
+					* @return string
+					*/
 	public function get_label()
 	{
 		return esc_html__('Mailpoet Confirm', 'elementor-pro');
@@ -79,13 +108,26 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 		);
 
 		$widget->add_control(
+			'mailpoet_confirm_validate',
+			[
+				'label' => esc_html__( 'Validate Email', 'elementor-pro' ),
+				'type' => \Elementor\Controls_Manager::SWITCHER,
+				'label_on' => esc_html__( 'Yes', 'textdomain' ),
+				'label_off' => esc_html__( 'No', 'textdomain' ),
+				'return_value' => 'yes',
+				'description' => 'Only subscribe to the list if given email address validates',
+				'default' => 'yes',
+			]
+		);
+
+		$widget->add_control(
 			'mailpoet_confirm_chance',
 			[
 				'label' => esc_html__('Subscribe Chance', 'elementor-pro'),
 				'type' => \Elementor\Controls_Manager::NUMBER,
 				'label_block' => true,
 				'render_type' => 'none',
-				'description' => 'the chance (as a percentage) that the user will be subscribed.',
+				'description' => 'The chance (as a percentage) that the user will be subscribed.',
 				'default' => '100',
 			]
 		);
@@ -105,19 +147,34 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	 */
 	public function run($record, $ajax_handler)
 	{
-		$random_number = rand(0, 100);
+		$random_number = rand(min: 0, max: 100);
 		$settings = $record->get('form_settings');
 
 		// if the chance check fails, then no confirmation will occur (used for the random discount code sending for demo plugins)
-		if(!($random_number <= $settings['mailpoet_confirm_chance']))
+		if (!($random_number <= $settings['mailpoet_confirm_chance']))
 			return;
 
 		$subscriber['email'] = $record->get('sent_data')['email'];
 
+		if ($settings['mailpoet_confirm_validate'] == 'yes') {
+			// check DNS record to determine deliverability
+			if(!validate_email_with_mx($subscriber['email']))
+			{
+				return;
+			}
+
+			// check if domain is a well known temp mail provider (idc if they can get the downloads, but i 
+			// just don't want to send subsequent correspondance as the email will inevitably be invalidated)
+			if(is_temporary_email($subscriber['email']))
+			{
+				return;
+			}
+		}
+
 		$existing_subscriber = false;
 
 		$extra_options['send_confirmation_email'] = false;
-		$extra_options['schedule_welcome_email'] = true;
+		$extra_options['schedule_welcome_email'] = false;
 		$extra_options['skip_subscriber_notification'] = false;
 
 		$mailpoet_api = \MailPoet\API\API::MP('v1');
@@ -136,7 +193,6 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 		}
 
 		if ($existing_subscriber) {
-
 			$mailpoet_api->subscribeToLists($subscriber['email'], (array) $settings['mailpoet_confirm_lists'], $extra_options);
 		}
 
@@ -224,8 +280,8 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 		return [
 			'default' => $mailpoet_fields,
 			'condition' => [
-				'mailpoet_confirm_lists!' => '',
-			],
+					'mailpoet_confirm_lists!' => '',
+				],
 		];
 	}
 
