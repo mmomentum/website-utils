@@ -147,7 +147,7 @@ class Mailpoet_Confirm_After_Submit extends \ElementorPro\Modules\Forms\Classes\
 	 */
 	public function run($record, $ajax_handler)
 	{
-		$random_number = rand(min: 0, max: 100);
+		$random_number = rand(0, 100);
 		$settings = $record->get('form_settings');
 
 		// if the chance check fails, then no confirmation will occur (used for the random discount code sending for demo plugins)
