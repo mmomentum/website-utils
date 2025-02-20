@@ -7,95 +7,75 @@
  * Author URI: https://lese.io
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-    exit; // Exit if accessed directly.
+if (!defined('ABSPATH')) {
+    exit; // Prevent direct access
 }
 
-class AWSSNSMailPoet {
-    public function __construct() {
-        add_action( 'rest_api_init', array( $this, 'register_endpoints' ) );
+// Register REST API route
+add_action('rest_api_init', function () {
+    register_rest_route('aws-sns/v1', '/notification', [
+        'methods'  => 'POST',
+        'callback' => 'aws_sns_mailpoet_handle_notification',
+        'permission_callback' => '__return_true', // Allow public access
+    ]);
+});
+
+function aws_sns_mailpoet_handle_notification(WP_REST_Request $request) {
+    global $wpdb;
+
+    // Get raw POST data
+    $data = $request->get_body();
+    $decoded = json_decode($data, true);
+
+    if (!$decoded || !isset($decoded['Message'])) {
+        error_log("AWS SNS: Invalid JSON received");
+        return new WP_REST_Response(['error' => 'Invalid JSON'], 400);
     }
 
-    public function register_endpoints() {
-        register_rest_route( 'aws-sns/v1', '/notification', array(
-            'methods' => 'POST',
-            'callback' => array( $this, 'handle_sns_notification' ),
-        ));
+    // Decode the actual SES message from SNS payload
+    $sesMessage = json_decode($decoded['Message'], true);
+    if (!$sesMessage || !isset($sesMessage['notificationType'])) {
+        error_log("AWS SNS: Invalid SES message format");
+        return new WP_REST_Response(['error' => 'Invalid SES message'], 400);
     }
 
-    public function handle_sns_notification( $request ) 
-	{
-        $body = json_decode( $request->get_body(), true );
-
-        if ( isset( $body['Type'] ) && $body['Type'] == 'SubscriptionConfirmation' ) 
-		{
-            $this->confirm_subscription( $body['SubscribeURL'] );
-            return new WP_REST_Response( 'Subscription confirmed', 200 );
+    // Extract bounced or complained email addresses
+    $emails = [];
+    if ($sesMessage['notificationType'] === 'Bounce') {
+        foreach ($sesMessage['bounce']['bouncedRecipients'] as $recipient) {
+            $emails[] = sanitize_email($recipient['emailAddress']);
         }
-
-        if ( isset( $body['Type'] ) && $body['Type'] == 'Notification' )
-		{
-            $message = json_decode( $body['Message'], true );
-
-            if ( isset( $message['notificationType'] ) ) 
-			{
-                $email = '';
-
-                switch ( $message['notificationType'] ) 
-				{
-                    case 'Bounce':
-                        $email = $message['bounce']['bouncedRecipients'][0]['emailAddress'];
-						$this->log('Bounce notification for email: ' . $email);
-                        $this->update_mailpoet_status( $email, 'bounced' );
-                        break;
-
-                    case 'Complaint':
-                        $email = $message['complaint']['complainedRecipients'][0]['emailAddress'];
-						$this->log('Complaint notification for email: ' . $email);
-                        $this->update_mailpoet_status( $email, 'complaint' );
-                        break;
-                }
-            }
+    } elseif ($sesMessage['notificationType'] === 'Complaint') {
+        foreach ($sesMessage['complaint']['complainedRecipients'] as $recipient) {
+            $emails[] = sanitize_email($recipient['emailAddress']);
         }
-
-        return new WP_REST_Response( 'Notification handled', 200 );
     }
 
-    private function confirm_subscription( $subscribe_url ) {
-        $response = wp_remote_get( $subscribe_url );
+    // If no emails found, return success but log
+    if (empty($emails)) {
+        error_log("AWS SNS: No email addresses found in the notification");
+        return new WP_REST_Response(['message' => 'No affected emails'], 200);
+    }
 
-        if ( is_wp_error( $response ) ) {
-            $this->log('AWS SNS subscription confirmation failed: ' . $response->get_error_message());
+    // Update MailPoet database table
+    $table_name = $wpdb->prefix . 'mailpoet_subscribers';
+
+    foreach ($emails as $email) {
+        $result = $wpdb->update(
+            $table_name,
+            ['status' => 'bounced'], 
+            ['email' => $email],
+            ['%s'],
+            ['%s']
+        );
+
+        if ($result !== false) {
+            error_log("AWS SNS: Marked as bounced in database - $email");
         } else {
-            $this->log('AWS SNS subscription confirmed: ' . $subscribe_url);
+            error_log("AWS SNS: Failed to update status for - $email");
         }
     }
 
-    private function update_mailpoet_status( $email, $status ) 
-	{
-		$mailpoet_api = \MailPoet\API\API::MP('v1');
-
-            if ( $status == 'bounced' ) 
-			{
-                $mailpoet_api->unsubscribe($email);
-				$this->log("Subscriber with email $email has been unsubcribed.");
-            } 
-			elseif ( $status == 'complaint' ) 
-			{
-                $mailpoet_api->unsubscribe($email);
-				$this->log("Subscriber with email $email has been unsubcribed.");
-            }
-			else
-			{
-				$this->log("Status code not found");
-			}
-    }
-	
-	private function log( $message ) {
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            error_log( $message );
-        }
-    }
+    return new WP_REST_Response(['message' => 'Processed successfully'], 200);
 }
 
-new AWSSNSMailPoet();
